@@ -21,20 +21,21 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	}
 
 	msgHandler.SendResponse(true, "Ready for data")
+
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
 	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
 	file.Close()
 
 	serverCheck := md5.Sum(nil)
-
-	clientCheckMsg, _ := msgHandler.Receive()
-	clientCheck := clientCheckMsg.GetChecksum().Checksum
+	clientCheck := request.GetChecksum()
 
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully stored file.")
+		msgHandler.SendResponse(true, "Storage complete")
 	} else {
 		log.Println("FAILED to store file. Invalid checksum.")
+		msgHandler.SendResponse(false, "Checksum verification failed")
 	}
 }
 

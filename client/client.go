@@ -21,21 +21,24 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Fatalln(err)
 	}
 
+	file, _ := os.Open(fileName)
+	md5Hash := md5.New()
+	io.Copy(md5Hash, file)
+	checksum := md5Hash.Sum(nil)
+	file.Close()
+
 	// Tell the server we want to store this file
-	msgHandler.SendStorageRequest(fileName, uint64(info.Size()))
+	msgHandler.SendStorageRequest(fileName, uint64(info.Size()), checksum)
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
 		return 1
 	}
 
-	file, _ := os.Open(fileName)
-	md5 := md5.New()
-	w := io.MultiWriter(msgHandler, md5)
-	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	file, _ = os.Open(fileName)
+	io.CopyN(msgHandler, file, info.Size())
 	file.Close()
 
-	checksum := md5.Sum(nil)
-	msgHandler.SendChecksumVerification(checksum)
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
+
 		return 1
 	}
 
