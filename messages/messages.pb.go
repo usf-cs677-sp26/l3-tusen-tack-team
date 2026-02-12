@@ -25,6 +25,7 @@ type StorageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileName      string                 `protobuf:"bytes,1,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
 	Size          uint64                 `protobuf:"varint,2,opt,name=size,proto3" json:"size,omitempty"`
+	Checksum      []byte                 `protobuf:"bytes,3,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -71,6 +72,13 @@ func (x *StorageRequest) GetSize() uint64 {
 		return x.Size
 	}
 	return 0
+}
+
+func (x *StorageRequest) GetChecksum() []byte {
+	if x != nil {
+		return x.Checksum
+	}
+	return nil
 }
 
 type RetrievalRequest struct {
@@ -399,10 +407,11 @@ var File_messages_proto protoreflect.FileDescriptor
 
 const file_messages_proto_rawDesc = "" +
 	"\n" +
-	"\x0emessages.proto\"A\n" +
+	"\x0emessages.proto\"]\n" +
 	"\x0eStorageRequest\x12\x1b\n" +
 	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12\x12\n" +
-	"\x04size\x18\x02 \x01(\x04R\x04size\"/\n" +
+	"\x04size\x18\x02 \x01(\x04R\x04size\x12\x1a\n" +
+	"\bchecksum\x18\x03 \x01(\fR\bchecksum\"/\n" +
 	"\x10RetrievalRequest\x12\x1b\n" +
 	"\tfile_name\x18\x01 \x01(\tR\bfileName\"2\n" +
 	"\x14ChecksumVerification\x12\x1a\n" +

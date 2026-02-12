@@ -21,23 +21,32 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Fatalln(err)
 	}
 
-	// Tell the server we want to store this file
-	msgHandler.SendStorageRequest(fileName, uint64(info.Size()))
-	if ok, _ := msgHandler.ReceiveResponse(); !ok {
-		return 1
-	}
-
+	// Get the file checksum first
 	file, _ := os.Open(fileName)
+
 	md5 := md5.New()
-	w := io.MultiWriter(msgHandler, md5)
-	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	io.CopyN(md5, file, info.Size())
+	checksum := md5.Sum(nil)
+	fmt.Printf("Client checksum (before transfer): %x\n", checksum)
 	file.Close()
 
-	checksum := md5.Sum(nil)
-	msgHandler.SendChecksumVerification(checksum)
-	if ok, _ := msgHandler.ReceiveResponse(); !ok {
+	// Tell the server we want to store this file
+	msgHandler.SendStorageRequest(fileName, uint64(info.Size()), checksum)
+	ok, resp := msgHandler.ReceiveResponse()
+	if ok {
+		fmt.Println("Server says: ", resp)
+		fmt.Println("Begin sending file, size: ", info.Size())
+	} else {
 		return 1
 	}
+
+	file, _ = os.Open(fileName)
+	io.CopyN(msgHandler, file, info.Size())
+	file.Close()
+
+	// if ok, _ := msgHandler.ReceiveResponse(); !ok {
+	// 	return 1
+	// }
 
 	fmt.Println("Storage complete!")
 	return 0

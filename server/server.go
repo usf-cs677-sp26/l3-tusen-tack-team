@@ -28,15 +28,16 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	serverCheck := md5.Sum(nil)
 
-	clientCheckMsg, _ := msgHandler.Receive()
-	clientCheck := clientCheckMsg.GetChecksum().Checksum
+	// clientCheckMsg, _ := msgHandler.Receive()
+	// clientCheck := clientCheckMsg.GetChecksum().Checksum
+	clientChecksum := request.GetChecksum()
 
-	if util.VerifyChecksum(serverCheck, clientCheck) {
+	if util.VerifyChecksum(serverCheck, clientChecksum) {
 		log.Println("Successfully stored file.")
-		msgHandler.SendResponse(true, "Your file has been stored")
+		msgHandler.SendResponse(true, "Checksum match! Your file has been stored")
 	} else {
 		log.Println("FAILED to store file. Invalid checksum.")
-		msgHandler.SendResponse(false, "Your file was not stored")
+		msgHandler.SendResponse(false, "Uh-oh! Checksum did not match! Your file was not stored")
 	}
 }
 

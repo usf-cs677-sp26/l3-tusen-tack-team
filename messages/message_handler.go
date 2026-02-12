@@ -83,8 +83,8 @@ func (m *MessageHandler) Close() {
 	m.conn.Close()
 }
 
-func (m *MessageHandler) SendStorageRequest(fileName string, size uint64) error {
-	msg := StorageRequest{FileName: fileName, Size: size}
+func (m *MessageHandler) SendStorageRequest(fileName string, size uint64, checksum []byte) error {
+	msg := StorageRequest{FileName: fileName, Size: size, Checksum: checksum}
 	wrapper := &Wrapper{
 		Msg: &Wrapper_StorageReq{StorageReq: &msg},
 	}
