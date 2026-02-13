@@ -100,8 +100,6 @@ func get(msgHandler *messages.MessageHandler, fileName string, dir string) int {
 		log.Println("FAILED to retrieve file. Invalid checksum.")
 		return 1
 	}
-
-	return 0
 }
 
 func main() {

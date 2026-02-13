@@ -9,10 +9,26 @@ import (
 	"log"
 	"net"
 	"os"
+	"syscall"
 )
+
+func hasEnoughSpace(size uint64) bool {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(".", &stat); err != nil {
+		log.Println("Error checking disk space: ", err)
+		return false
+	}
+	avail := stat.Bavail * uint64(stat.Bsize)
+	return avail >= size
+}
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
 	log.Println("Attempting to store", request.FileName)
+	if !hasEnoughSpace(request.Size) {
+		msgHandler.SendResponse(false, "Not enough space")
+		return
+	}
+
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		msgHandler.SendResponse(false, err.Error())
