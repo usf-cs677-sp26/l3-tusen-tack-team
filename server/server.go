@@ -24,7 +24,14 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
+	_, err = io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
+	if err != nil {
+		log.Println("Error receiving file data: ", err)
+		file.Close()
+		os.Remove(request.FileName)
+		msgHandler.SendResponse(false, "Failded to receive file data")
+		return
+	}
 	file.Close()
 
 	serverCheck := md5.Sum(nil)
@@ -52,10 +59,20 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 
 	msgHandler.SendRetrievalResponse(true, "Ready to send", uint64(info.Size()))
 
-	file, _ := os.Open(request.FileName)
+	file, err := os.Open(request.FileName)
+	if err != nil {
+		log.Println("Error opening file: ", err)
+		msgHandler.SendResponse(false, err.Error())
+		return
+	}
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
-	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	_, err = io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	if err != nil {
+		log.Println("Error sending file data: ", err)
+		file.Close()
+		return
+	}
 	file.Close()
 
 	checksum := md5.Sum(nil)
@@ -68,7 +85,8 @@ func handleClient(msgHandler *messages.MessageHandler) {
 	for {
 		wrapper, err := msgHandler.Receive()
 		if err != nil {
-			log.Println(err)
+			log.Println("Client disconnected:", err)
+			return
 		}
 
 		switch msg := wrapper.Msg.(type) {

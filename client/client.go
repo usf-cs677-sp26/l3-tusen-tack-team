@@ -22,7 +22,11 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Fatalln(err)
 	}
 
-	file, _ := os.Open(fileName)
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Println("Error opening file: ", err)
+		return 1
+	}
 	md5Hash := md5.New()
 	io.Copy(md5Hash, file)
 	checksum := md5Hash.Sum(nil)
@@ -34,9 +38,17 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		return 1
 	}
 
-	file, _ = os.Open(fileName)
-	io.CopyN(msgHandler, file, info.Size())
+	file, err = os.Open(fileName)
+	if err != nil {
+		log.Println("Error opening file: ", err)
+		return 1
+	}
+	_, err = io.CopyN(msgHandler, file, info.Size())
 	file.Close()
+	if err != nil {
+		log.Println("Error sending file data: ", err)
+		return 1
+	}
 
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
 
@@ -65,17 +77,28 @@ func get(msgHandler *messages.MessageHandler, fileName string, dir string) int {
 
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	io.CopyN(w, msgHandler, int64(size))
+	_, err = io.CopyN(w, msgHandler, int64(size))
+	if err != nil {
+		log.Println("Error receiving file data: ", err)
+		file.Close()
+		return 1
+	}
 	file.Close()
 
 	clientCheck := md5.Sum(nil)
-	checkMsg, _ := msgHandler.Receive()
+	checkMsg, err := msgHandler.Receive()
+	if err != nil {
+		log.Println("Error receiving checksum: ", err)
+		return 1
+	}
 	serverCheck := checkMsg.GetChecksum().Checksum
 
 	if util.VerifyChecksum(serverCheck, clientCheck) {
 		log.Println("Successfully retrieved file.")
+		return 0
 	} else {
 		log.Println("FAILED to retrieve file. Invalid checksum.")
+		return 1
 	}
 
 	return 0
