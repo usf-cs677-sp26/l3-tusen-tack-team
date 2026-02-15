@@ -13,6 +13,16 @@ import (
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
 	log.Println("Attempting to store", request.FileName)
+
+	// Check storage space
+	fileSize := request.Size
+	freeSpace, err := util.GetStorageSize(".")
+	fmt.Printf("Free disk space: %d\nFilesize: %d\n", freeSpace, fileSize)
+	if freeSpace < request.Size {
+		fmt.Println("Not enough disk space")
+		msgHandler.SendResponse(false, "Not enough disk space")
+	}
+
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		msgHandler.SendResponse(false, err.Error())
@@ -23,7 +33,7 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	msgHandler.SendResponse(true, "Ready for data")
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
+	io.CopyN(w, msgHandler, int64(fileSize)) /* Write and checksum as we go */
 	file.Close()
 
 	serverCheck := md5.Sum(nil)

@@ -3,6 +3,8 @@ package util
 import (
 	"log"
 	"reflect"
+
+	"golang.org/x/sys/unix"
 )
 
 func VerifyChecksum(serverCheck []byte, clientCheck []byte) bool {
@@ -15,4 +17,12 @@ func VerifyChecksum(serverCheck []byte, clientCheck []byte) bool {
 		log.Println("Checksums DO NOT match")
 		return false
 	}
+}
+
+func GetStorageSize(path string) (uint64, error) {
+	var st unix.Statfs_t
+	if err := unix.Statfs(path, &st); err != nil {
+		return 0, err
+	}
+	return st.Bavail * uint64(st.Bsize), nil
 }
