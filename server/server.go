@@ -13,6 +13,7 @@ import (
 	"syscall"
 )
 
+// hasEnoughSpace checks the server has enough space for the file
 func hasEnoughSpace(size uint64) bool {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(".", &stat); err != nil {
@@ -24,6 +25,7 @@ func hasEnoughSpace(size uint64) bool {
 }
 
 // sanitizeFileName removes any directory components from filename
+// We want to prevent a filepath attack
 func sanitizeFileName(fileName string) string {
 	return filepath.Base(fileName)
 }

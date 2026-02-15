@@ -51,7 +51,6 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 	}
 
 	if ok, _ := msgHandler.ReceiveResponse(); !ok {
-
 		return 1
 	}
 
