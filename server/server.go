@@ -17,10 +17,9 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	// Check storage space
 	fileSize := request.Size
 	freeSpace, err := util.GetStorageSize(".")
-	fmt.Printf("Free disk space: %d\nFilesize: %d\n", freeSpace, fileSize)
 	if freeSpace < request.Size {
-		fmt.Println("Not enough disk space")
 		msgHandler.SendResponse(false, "Not enough disk space")
+		return
 	}
 
 	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
@@ -33,21 +32,30 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	msgHandler.SendResponse(true, "Ready for data")
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	io.CopyN(w, msgHandler, int64(fileSize)) /* Write and checksum as we go */
+
+	/* Write and checksum as we go */
+	n, err := io.CopyN(w, msgHandler, int64(fileSize))
+	if err != nil {
+		msgHandler.SendResponse(false, err.Error())
+		os.Remove(request.FileName)
+		return
+	}
+	if n != int64(fileSize) {
+		msgHandler.SendResponse(false, "short copy")
+		os.Remove(request.FileName)
+		return
+	}
 	file.Close()
 
 	serverCheck := md5.Sum(nil)
 
-	// clientCheckMsg, _ := msgHandler.Receive()
-	// clientCheck := clientCheckMsg.GetChecksum().Checksum
 	clientChecksum := request.GetChecksum()
 
 	if util.VerifyChecksum(serverCheck, clientChecksum) {
-		log.Println("Successfully stored file.")
 		msgHandler.SendResponse(true, "Checksum match! Your file has been stored")
 	} else {
-		log.Println("FAILED to store file. Invalid checksum.")
 		msgHandler.SendResponse(false, "Uh-oh! Checksum did not match! Your file was not stored")
+		os.Remove(request.FileName)
 	}
 }
 
@@ -57,7 +65,8 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 	// Get file size and make sure it exists
 	info, err := os.Stat(request.FileName)
 	if err != nil {
-		log.Fatalln(err)
+		msgHandler.SendResponse(false, "Failed to stat file")
+		return
 	}
 
 	msgHandler.SendRetrievalResponse(true, "Ready to send", uint64(info.Size()))
@@ -65,7 +74,15 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 	file, _ := os.Open(request.FileName)
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
-	io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	n, err := io.CopyN(w, file, info.Size())
+	if err != nil {
+		msgHandler.SendResponse(false, "Failed to retrieve file")
+		return
+	}
+	if n != info.Size() {
+		msgHandler.SendResponse(false, "short copy")
+		return
+	}
 	file.Close()
 
 	checksum := md5.Sum(nil)
@@ -79,6 +96,7 @@ func handleClient(msgHandler *messages.MessageHandler) {
 		wrapper, err := msgHandler.Receive()
 		if err != nil {
 			log.Println(err)
+			return
 		}
 
 		switch msg := wrapper.Msg.(type) {

@@ -2,6 +2,7 @@ package messages
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"net"
 
@@ -27,6 +28,9 @@ func (m *MessageHandler) ReadN(buf []byte) error {
 		if err != nil {
 			return err
 		}
+		if n == 0 {
+			return fmt.Errorf("read: zero-byte progress")
+		}
 		bytesRead += uint64(n)
 	}
 	return nil
@@ -47,6 +51,9 @@ func (m *MessageHandler) WriteN(buf []byte) error {
 		if err != nil {
 			return err
 		}
+		if n == 0 {
+			return fmt.Errorf("write: zero-byte progress")
+		}
 		bytesWritten += uint64(n)
 	}
 	return nil
@@ -60,23 +67,32 @@ func (m *MessageHandler) Send(wrapper *Wrapper) error {
 
 	prefix := make([]byte, 8)
 	binary.LittleEndian.PutUint64(prefix, uint64(len(serialized)))
-	m.WriteN(prefix)
-	m.WriteN(serialized)
-
+	if err := m.WriteN(prefix); err != nil {
+		return err
+	}
+	if err := m.WriteN(serialized); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (m *MessageHandler) Receive() (*Wrapper, error) {
 	prefix := make([]byte, 8)
-	m.ReadN(prefix)
+	if err := m.ReadN(prefix); err != nil {
+		return nil, err
+	}
 
 	payloadSize := binary.LittleEndian.Uint64(prefix)
 	payload := make([]byte, payloadSize)
-	m.ReadN(payload)
+	if err := m.ReadN(payload); err != nil {
+		return nil, err
+	}
 
 	wrapper := &Wrapper{}
-	err := proto.Unmarshal(payload, wrapper)
-	return wrapper, err
+	if err := proto.Unmarshal(payload, wrapper); err != nil {
+		return nil, err
+	}
+	return wrapper, nil
 }
 
 func (m *MessageHandler) Close() {
