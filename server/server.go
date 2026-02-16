@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 )
 
 func handleStorage(msgHandler *messages.MessageHandler, request *messages.StorageRequest) {
@@ -22,7 +23,9 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		return
 	}
 
-	file, err := os.OpenFile(request.FileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+	safeName := filepath.Base(request.FileName)
+	dest := filepath.Join(".", safeName)
+	file, err := os.OpenFile(dest, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 	if err != nil {
 		msgHandler.SendResponse(false, err.Error())
 		msgHandler.Close()
@@ -36,13 +39,15 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 	/* Write and checksum as we go */
 	n, err := io.CopyN(w, msgHandler, int64(fileSize))
 	if err != nil {
+		file.Close()
 		msgHandler.SendResponse(false, err.Error())
-		os.Remove(request.FileName)
+		os.Remove(dest)
 		return
 	}
 	if n != int64(fileSize) {
+		file.Close()
 		msgHandler.SendResponse(false, "short copy")
-		os.Remove(request.FileName)
+		os.Remove(dest)
 		return
 	}
 	file.Close()
@@ -55,15 +60,18 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 		msgHandler.SendResponse(true, "Checksum match! Your file has been stored")
 	} else {
 		msgHandler.SendResponse(false, "Uh-oh! Checksum did not match! Your file was not stored")
-		os.Remove(request.FileName)
+		os.Remove(dest)
 	}
 }
 
 func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.RetrievalRequest) {
 	log.Println("Attempting to retrieve", request.FileName)
 
+	safeName := filepath.Base(request.FileName)
+	src := filepath.Join(".", safeName)
+
 	// Get file size and make sure it exists
-	info, err := os.Stat(request.FileName)
+	info, err := os.Stat(src)
 	if err != nil {
 		msgHandler.SendResponse(false, "Failed to stat file")
 		return
@@ -71,16 +79,25 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 
 	msgHandler.SendRetrievalResponse(true, "Ready to send", uint64(info.Size()))
 
-	file, _ := os.Open(request.FileName)
+	file, err := os.Open(src)
+	if err != nil {
+		log.Printf("Failed to open retrieval source %s: %v", src, err)
+		msgHandler.Close()
+		return
+	}
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
 	n, err := io.CopyN(w, file, info.Size())
 	if err != nil {
-		msgHandler.SendResponse(false, "Failed to retrieve file")
+		file.Close()
+		log.Printf("Failed to stream retrieval %s: %v", src, err)
+		msgHandler.Close()
 		return
 	}
 	if n != info.Size() {
-		msgHandler.SendResponse(false, "short copy")
+		file.Close()
+		log.Printf("Short retrieval stream %s: sent %d of %d bytes", src, n, info.Size())
+		msgHandler.Close()
 		return
 	}
 	file.Close()
