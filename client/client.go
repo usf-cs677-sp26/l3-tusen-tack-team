@@ -44,8 +44,8 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Println("Error opening file: ", err)
 		return 1
 	}
-	buf := make([]byte, 1024*1024)
-	_, err = io.CopyBuffer(msgHandler, io.LimitReader(file, info.Size()), buf)
+	buff := make([]byte, 1024*1024)
+	_, err = io.CopyBuffer(msgHandler, io.LimitReader(file, info.Size()), buff)
 	file.Close()
 	if err != nil {
 		log.Println("Error sending file data: ", err)
