@@ -49,7 +49,8 @@ func handleStorage(msgHandler *messages.MessageHandler, request *messages.Storag
 
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	_, err = io.CopyN(w, msgHandler, int64(request.Size)) /* Write and checksum as we go */
+	buf := make([]byte, 1024*1024) // 1MB buffer for better performance
+	_, err = io.CopyBuffer(w, io.LimitReader(msgHandler, int64(request.Size)), buf)
 	if err != nil {
 		log.Println("Error receiving file data: ", err)
 		file.Close()
@@ -94,7 +95,8 @@ func handleRetrieval(msgHandler *messages.MessageHandler, request *messages.Retr
 	}
 	md5 := md5.New()
 	w := io.MultiWriter(msgHandler, md5)
-	_, err = io.CopyN(w, file, info.Size()) // Checksum and transfer file at same time
+	buf := make([]byte, 1024*1024) // 1MB buffer for better performance
+	_, err = io.CopyBuffer(w, io.LimitReader(file, info.Size()), buf)
 	if err != nil {
 		log.Println("Error sending file data: ", err)
 		file.Close()

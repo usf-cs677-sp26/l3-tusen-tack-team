@@ -28,7 +28,8 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		return 1
 	}
 	md5Hash := md5.New()
-	io.Copy(md5Hash, file)
+	buf := make([]byte, 1024*1024) // 1MB buffer for better performance
+	io.CopyBuffer(md5Hash, file, buf)
 	checksum := md5Hash.Sum(nil)
 	file.Close()
 
@@ -43,7 +44,8 @@ func put(msgHandler *messages.MessageHandler, fileName string) int {
 		log.Println("Error opening file: ", err)
 		return 1
 	}
-	_, err = io.CopyN(msgHandler, file, info.Size())
+	buf := make([]byte, 1024*1024)
+	_, err = io.CopyBuffer(msgHandler, io.LimitReader(file, info.Size()), buf)
 	file.Close()
 	if err != nil {
 		log.Println("Error sending file data: ", err)
@@ -76,7 +78,8 @@ func get(msgHandler *messages.MessageHandler, fileName string, dir string) int {
 
 	md5 := md5.New()
 	w := io.MultiWriter(file, md5)
-	_, err = io.CopyN(w, msgHandler, int64(size))
+	buf := make([]byte, 1024*1024) // 1MB buffer for better performance
+	_, err = io.CopyBuffer(w, io.LimitReader(msgHandler, int64(size)), buf)
 	if err != nil {
 		log.Println("Error receiving file data: ", err)
 		file.Close()

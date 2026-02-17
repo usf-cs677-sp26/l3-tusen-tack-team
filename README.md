@@ -1,6 +1,6 @@
 # file-transfer
 
-It does work.
+It does work. But, this is not good for transferring a large file because PUT (client.go) opens the file twice. Our team decided to send the checksum at the same time when we send a storage request. But, sending a checksum verification separately is better because we can read and send the file to the network and calculate the checksum simultaneously by using io.TeeReader.
 
 ## How to run
 
